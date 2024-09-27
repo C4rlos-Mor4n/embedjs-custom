@@ -40,8 +40,6 @@ export class G4FCustom extends BaseModel {
         "You are an assistant whose only function is to answer questions based on the provided CONTEXT. Do not invent answers. If you can't find the answer in the CONTEXT, simply say that you don't have enough information.",
     };
 
-    console.log("supportingContext", supportingContext);
-
     const contextMessage = {
       role: "user",
       content: `CONTEXT: "${supportingContext
