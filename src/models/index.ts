@@ -23,7 +23,9 @@ export class G4FCustom extends BaseModel {
   }
 
   override async init(): Promise<void> {
-    console.log(`Initialized model ${this.modelName}`);
+    console.log(
+      `Model ${this.modelName} initialized with temperature ${this.temperature}`
+    );
   }
 
   public async runQuery(
@@ -32,43 +34,60 @@ export class G4FCustom extends BaseModel {
     supportingContext: Chunk[],
     pastConversations: Message[]
   ): Promise<ModelResponse> {
-    const messages = [
-      { role: "system", content: system },
-      ...supportingContext.map((context) => ({
-        role: "system",
-        content: context.pageContent,
-      })),
-      ...pastConversations.map((conversation) => {
-        return {
-          role: conversation.actor === "AI" ? "assistant" : "user",
-          content: conversation.content,
-        };
-      }),
-      { role: "user", content: userQuery },
-    ];
+    const assistantInstructionMessage = {
+      role: "system",
+      content:
+        "You are an assistant whose only function is to answer questions based on the provided CONTEXT. Do not invent answers. If you can't find the answer in the CONTEXT, simply say that you don't have enough information.",
+    };
 
-    console.log("Running query with g4f:", messages);
+    console.log("supportingContext", supportingContext);
+
+    const contextMessage = {
+      role: "user",
+      content: `CONTEXT: "${supportingContext
+        .map((context) => context.pageContent)
+        .join(" ")}"`,
+    };
+
+    const conversationMessages = pastConversations.map((conversation) => ({
+      role: conversation.actor === "AI" ? "assistant" : "user",
+      content: conversation.content,
+    }));
+
+    const userMessage = {
+      role: "user",
+      content: `Based on the CONTEXT provided, answer the following question: ${userQuery}`,
+    };
+
+    const messages = [
+      assistantInstructionMessage,
+      contextMessage,
+      ...conversationMessages,
+      userMessage,
+    ];
 
     const options = {
       provider: this.g4fInstance.providers.GPT,
       model: this.modelName,
-      debug: true,
+      debug: false,
     };
 
     try {
+      console.log("Running query with g4f:", messages);
       const result = await this.g4fInstance.chatCompletion(messages, options);
-      console.log("Result from g4f:", result);
 
       return {
         result: result,
         tokenUse: {
-          inputTokens: 0,
-          outputTokens: 0,
+          inputTokens: messages.length,
+          outputTokens: result.length,
         },
       };
     } catch (error) {
       console.error("Error running query with g4f:", error);
-      throw new Error("Error running query");
+      throw new Error(
+        `Error running query with model ${this.modelName}: ${error.message}`
+      );
     }
   }
 }
